@@ -1,9 +1,9 @@
 FROM --platform=$BUILDPLATFORM node:22-bookworm AS frontend-builder
-
 WORKDIR /frontend
+
 COPY frontend/package.json frontend/package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm,sharing=locked \
-    npm ci
+RUN npm ci
+
 COPY frontend ./
 RUN npm run build
 
@@ -14,28 +14,25 @@ ARG TARGETOS
 ARG TARGETARCH
 
 WORKDIR /src
+
 COPY go.mod go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    go mod download
+RUN go mod download
 
 COPY cmd ./cmd
 COPY internal ./internal
 COPY static ./static
 COPY --from=frontend-builder /frontend/out /src/static/admin
 
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=cache,target=/root/.cache/go-build \
-    set -eux; \
+RUN set -eux; \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-      go build -v -trimpath \
-              -ldflags="-s -w" \
-              -o /out/notion2api ./cmd/notion2api
+    go build -v -trimpath \
+    -ldflags="-s -w" \
+    -o /out/notion2api ./cmd/notion2api
 
 FROM alpine:3.22
-
 ARG TARGETARCH
 ENV TZ=Asia/Shanghai
+
 WORKDIR /app
 
 RUN apk add --no-cache ca-certificates tzdata curl tini \
